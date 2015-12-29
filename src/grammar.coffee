@@ -116,7 +116,12 @@ grammar =
     o 'Switch'
     o 'Class'
     o 'Throw'
+    o 'Await'
     o 'Yield'
+  ]
+  
+  Await: [
+    o 'AWAIT Expression',                       -> new Op $1, $2
   ]
 
   Yield: [
@@ -205,6 +210,11 @@ grammar =
   Return: [
     o 'RETURN Expression',                      -> new Return $2
     o 'RETURN',                                 -> new Return
+  ]
+  
+  AwaitReturn: [
+    o 'AWAIT RETURN Expression',                -> new AwaitReturn $3
+    o 'AWAIT RETURN',                           -> new AwaitReturn
   ]
 
   YieldReturn: [

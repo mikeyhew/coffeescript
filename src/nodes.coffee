@@ -90,6 +90,9 @@ exports.Base = class Base
         meth = 'call'
       func = new Value func, [new Access new Literal meth]
     parts = (new Call func, args).compileNode o
+    if func.isAsync or func.base?.isAsync
+      parts.unshift @makeCode "(await "
+      parts.push    @makeCode ")"
     if func.isGenerator or func.base?.isGenerator
       parts.unshift @makeCode "(yield* "
       parts.push    @makeCode ")"
@@ -460,8 +463,13 @@ exports.Return = class Return extends Base
     answer.push @makeCode ";"
     return answer
 
-# `yield return` works exactly like `return`, except that it turns the function
-# into a generator.
+# `await return` and `yield return` work exactly like `return`, except that they turn the function
+# into an async function or generator, respectively.
+exports.AwaitReturn = class AwaitReturn extends Return
+  compileNode: (o) ->
+    unless o.scope.parent?
+      @error 'await can only occur inside functions'
+    super
 exports.YieldReturn = class YieldReturn extends Return
   compileNode: (o) ->
     unless o.scope.parent?
@@ -1389,6 +1397,8 @@ exports.Code = class Code extends Base
     @params      = params or []
     @body        = body or new Block
     @bound       = tag is 'boundfunc'
+    @isAsync     = !!@body.contains (node) ->
+      (node instanceof Op and node.isAwait()) or node instanceof AwaitReturn
     @isGenerator = !!@body.contains (node) ->
       (node instanceof Op and node.isYield()) or node instanceof YieldReturn
 
@@ -1456,7 +1466,9 @@ exports.Code = class Code extends Base
       node.error "multiple parameters named #{name}" if name in uniqs
       uniqs.push name
     @body.makeReturn() unless wasEmpty or @noReturn
-    code = 'function'
+    code = ''
+    code += 'async ' if @isAsync
+    code += 'function'
     code += '*' if @isGenerator
     code += ' ' + @name if @ctor
     code += '('
@@ -1706,6 +1718,9 @@ exports.Op = class Op extends Base
   children: ['first', 'second']
 
   isSimpleNumber: NO
+  
+  isAwait: ->
+    @operator in ['await']
 
   isYield: ->
     @operator in ['yield', 'yield*']
@@ -1777,6 +1792,7 @@ exports.Op = class Op extends Base
       @error 'delete operand may not be argument or var'
     if @operator in ['--', '++'] and @first.unwrapAll().value in STRICT_PROSCRIBED
       @error "cannot increment/decrement \"#{@first.unwrapAll().value}\""
+    return @compileAwait     o if @isAwait()
     return @compileYield     o if @isYield()
     return @compileUnary     o if @isUnary()
     return @compileChain     o if isChain
@@ -1831,7 +1847,22 @@ exports.Op = class Op extends Base
     parts.push @first.compileToFragments o, LEVEL_OP
     parts.reverse() if @flip
     @joinFragmentArrays parts, ''
-
+  
+  compileAwait: (o) ->
+    parts = []
+    op = @operator
+    unless o.scope.parent?
+      @error 'await can only occur inside functions'
+    if 'expression' in Object.keys(@first) and not (@first instanceof Throw)
+      parts.push @first.expression.compileToFragments o, LEVEL_OP if @first.expression?
+    else
+      parts.push [@makeCode "("] if o.level >= LEVEL_PAREN
+      parts.push [@makeCode op]
+      parts.push [@makeCode " "] if @first.base?.value isnt ''
+      parts.push @first.compileToFragments o, LEVEL_OP
+      parts.push [@makeCode ")"] if o.level >= LEVEL_PAREN
+    @joinFragmentArrays parts, ''
+  
   compileYield: (o) ->
     parts = []
     op = @operator
