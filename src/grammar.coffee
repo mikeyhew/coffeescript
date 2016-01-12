@@ -83,12 +83,13 @@ grammar =
     o 'Body TERMINATOR'
   ]
 
-  # Block and statements, which make up a line in a body. YieldReturn is a
-  # statement, but not included in Statement because that results in an ambigous
+  # Block and statements, which make up a line in a body. AwaitReturn and YieldReturn
+  # are statements, but not included in Statement because that results in an ambigous
   # grammar.
   Line: [
     o 'Expression'
     o 'Statement'
+    o 'AwaitReturn'
     o 'YieldReturn'
   ]
 
@@ -642,6 +643,7 @@ operators = [
   ['left',      'COMPARE']
   ['left',      'LOGIC']
   ['nonassoc',  'INDENT', 'OUTDENT']
+  ['right',     'AWAIT']
   ['right',     'YIELD']
   ['right',     '=', ':', 'COMPOUND_ASSIGN', 'RETURN', 'THROW', 'EXTENDS']
   ['right',     'FORIN', 'FOROF', 'BY', 'WHEN']
