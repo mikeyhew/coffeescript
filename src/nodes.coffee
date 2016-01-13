@@ -1401,6 +1401,10 @@ exports.Code = class Code extends Base
       (node instanceof Op and node.isAwait()) or node instanceof AwaitReturn
     @isGenerator = !!@body.contains (node) ->
       (node instanceof Op and node.isYield()) or node instanceof YieldReturn
+    if @isAsync and @isGenerator
+      @error """
+        function may not contain both `yield` and `await` expressions. \
+        Async Generators are not currently supported."""
 
   children: ['params', 'body']
 
