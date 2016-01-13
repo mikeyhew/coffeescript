@@ -2,6 +2,8 @@ fs            = require 'fs'
 path          = require 'path'
 _             = require 'underscore'
 CoffeeScript  = require './lib/coffee-script'
+regenerator   = require 'regenerator'
+vm            = require 'vm'
 {spawn, exec} = require 'child_process'
 helpers       = require './lib/coffee-script/helpers'
 
@@ -287,7 +289,10 @@ runTests = (CoffeeScript) ->
     currentFile = filename = path.join 'test', file
     code = fs.readFileSync filename
     try
-      CoffeeScript.run code.toString(), {filename, literate}
+      ret = CoffeeScript.compile code.toString(), {filename, literate, sourceMap: true}
+      jsWithAsyncFns = ret.js
+      js = regenerator.compile jsWithAsyncFns, includeRuntime: true
+      vm.runInThisContext js, {filename}
     catch error
       failures.push {filename, error}
   return !failures.length
